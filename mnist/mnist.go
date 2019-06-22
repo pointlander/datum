@@ -85,13 +85,51 @@ func (d *Datum) Server(address string) error {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			i, err := strconv.Atoi(parts[length-1])
-			if err != nil {
+			name := strings.Split(parts[length-1], ".")
+			if len(name) != 2 {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			w.Header().Add("Content-Type", "image/png")
-			png.Encode(w, set.Images[i])
+			switch name[1] {
+			case "png":
+				i, err := strconv.Atoi(name[0])
+				if err != nil {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				w.Header().Add("Content-Type", "image/png")
+				if i < 0 {
+					i = -1
+				}
+				if i >= len(set.Images) {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				png.Encode(w, set.Images[i])
+			case "html":
+				i, err := strconv.Atoi(name[0])
+				if err != nil {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				w.Header().Add("Content-Type", "text/html")
+				if i < 0 {
+					i = -1
+				}
+				if i >= len(set.Images) {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+				fmt.Fprintf(w, "<html>\n")
+				fmt.Fprintf(w, " <head><title>image %d</title></head>\n", i)
+				fmt.Fprintf(w, " <body>\n")
+				fmt.Fprintf(w, "  <b>image %d: %d</b><br/>\n", i, set.Labels[i])
+				fmt.Fprintf(w, "  <img src=\"%d.png\"/>", i)
+				fmt.Fprintf(w, " </body>\n")
+				fmt.Fprintf(w, "</html>\n")
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
 		}
 	}
 	http.HandleFunc("/train/", handler(d.Train))
