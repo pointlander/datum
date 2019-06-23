@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/gob"
 	"flag"
 	"fmt"
@@ -11,7 +12,10 @@ import (
 	"github.com/petar/GoMNIST"
 )
 
-var MNIST = flag.Bool("mnist", false, "generate mnist gob file")
+var (
+	MNIST = flag.Bool("mnist", false, "generate mnist gob file")
+	Iris  = flag.Bool("iris", false, "generate iris asset")
+)
 
 // Set is a set of training data
 type Set struct {
@@ -86,5 +90,43 @@ func main() {
 		defer out.Close()
 		fmt.Fprintf(out, "package mnist\n\n")
 		fmt.Fprintf(out, "var Asset = []byte(%+q)\n", buffer.Bytes())
+		return
+	}
+
+	if *Iris {
+		getData := func(file string) []byte {
+			input, err := os.Open(file)
+			if err != nil {
+				panic(err)
+			}
+			defer input.Close()
+			reader := csv.NewReader(input)
+			data, err := reader.ReadAll()
+			if err != nil {
+				panic(err)
+			}
+			buffer := bytes.Buffer{}
+			compress, err := bzip2.NewWriter(&buffer, &bzip2.WriterConfig{Level: bzip2.BestCompression})
+			if err != nil {
+				panic(err)
+			}
+			encoder := gob.NewEncoder(compress)
+			encoder.Encode(data)
+			err = compress.Close()
+			if err != nil {
+				panic(err)
+			}
+			return buffer.Bytes()
+		}
+
+		fmt.Println("writing data...")
+		out, err := os.Create("assets.go")
+		if err != nil {
+			panic(err)
+		}
+		defer out.Close()
+		fmt.Fprintf(out, "package iris\n\n")
+		fmt.Fprintf(out, "var AssetFisher = []byte(%+q)\n", getData("iris.data"))
+		fmt.Fprintf(out, "var AssetBezdek = []byte(%+q)\n", getData("bezdekIris.data"))
 	}
 }
