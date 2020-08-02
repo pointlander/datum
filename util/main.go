@@ -10,6 +10,8 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 
 	"github.com/dsnet/compress/bzip2"
@@ -19,6 +21,7 @@ import (
 var (
 	MNIST = flag.Bool("mnist", false, "generate mnist gob file")
 	Iris  = flag.Bool("iris", false, "generate iris asset")
+	Bible = flag.Bool("bible", false, "generate bible asset")
 )
 
 // Set is a set of training data
@@ -132,5 +135,34 @@ func main() {
 		fmt.Fprintf(out, "package iris\n\n")
 		fmt.Fprintf(out, "var AssetFisher = []byte(%+q)\n", getData("iris.data"))
 		fmt.Fprintf(out, "var AssetBezdek = []byte(%+q)\n", getData("bezdekIris.data"))
+	}
+
+	if *Bible {
+		bible, err := http.Get("http://www.gutenberg.org/cache/epub/10/pg10.txt")
+		if err != nil {
+			panic(err)
+		}
+		defer bible.Body.Close()
+		buffer := bytes.Buffer{}
+		compress, err := bzip2.NewWriter(&buffer, &bzip2.WriterConfig{Level: bzip2.BestCompression})
+		if err != nil {
+			panic(err)
+		}
+		_, err = io.Copy(compress, bible.Body)
+		if err != nil {
+			panic(err)
+		}
+		err = compress.Close()
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("writing data...")
+		out, err := os.Create("assets.go")
+		if err != nil {
+			panic(err)
+		}
+		defer out.Close()
+		fmt.Fprintf(out, "package bible\n\n")
+		fmt.Fprintf(out, "var AssetBible = []byte(%+q)\n", buffer.Bytes())
 	}
 }
